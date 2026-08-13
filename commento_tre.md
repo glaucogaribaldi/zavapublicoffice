@@ -1,47 +1,54 @@
-# Commento di TRE — Analisi, Criticità e Decisioni Operative (Aggiornato - Audit Completato!)
+# Commento di TRE — Analisi, Criticità e Decisioni Operative (REAL VPS - Audit Completato!)
 
 Ciao Giacomo,
-Ho eseguito con successo l'audit completo della tua VPS e i risultati sono **incredibili**! Abbiamo a disposizione una macchina di gran lunga superiore rispetto alle stime iniziali e parte dell'infrastruttura critica è già configurata e perfettamente funzionante.
+Hai fatto benissimo a fermarmi! Quella di prima era l'istanza di `krakenfondazione` (che monta 2x T4). 
+Ho eseguito immediatamente l'audit della **REAL VPS dell'Ufficio** (IP: `34.63.231.43` / Tailscale: `100.116.213.114`). Questa è una macchina pulita, potentissima a livello di CPU/RAM, ed è una tela bianca pronta per essere scolpita!
 
-Ecco il report dettagliato dell'ispezione della VPS.
+Ecco il report dettagliato dell'ispezione della vera VPS dell'Ufficio (Milestone M0 completata con successo).
 
 ---
 
-## 📈 1. Report di Audit Tecnico della VPS (Milestone M0 Superata)
+## 📈 1. Report di Audit Tecnico della Vera VPS (Milestone M0 Superata)
 
-* **Sistema Operativo:** Debian GNU/Linux 13 (trixie) - Kernel `Linux 6.12.101+deb13-cloud-amd64`.
+* **Nome Host:** `ufficio`
+* **Sistema Operativo:** `Ubuntu 22.04.5 LTS (Jammy Jellyfish)` - Kernel `Linux 6.8.0-1065-gcp`.
 * **CPU & RAM Reali:** 
-  * La macchina è configurata con **8 vCPUs** (Intel Xeon 2.30GHz) e **52 GB di RAM** (50Gi totali rilevati), non 16 vCPUs / 104 GB. Questa potenza è comunque ampiamente sovrabbondante per i nostri scopi.
-* **GPU Configuration (La vera sorpresa!):**
-  * Non abbiamo una singola Tesla P4 (8 GB). La VPS ospita **2 x NVIDIA Tesla T4 da 15 GB di VRAM ciascuna**, per un totale di **30 GB di VRAM** dedicati all'AI!
-  * Le GPU utilizzano il driver ufficiale `550.163.01` e CUDA `12.4`.
-* **Stato dell'LLM Locale (Già attivo e configurato!):**
-  * Sulla macchina è già attivo e in esecuzione il servizio `kraken-nemotron.service`, che lancia un server `llama-server` (OpenAI compatible) sulla porta **`8080`** dell'IP Tailscale.
-  * Il modello caricato è **`unsloth/Nemotron-3-Nano-30B-A3B-GGUF:UD-Q4_K_XL`** (un modello potentissimo da 30B di parametri!).
-  * **La svolta:** Grazie ai **30 GB di VRAM delle due Tesla T4**, il modello da 30B è caricato **interamente in VRAM** (con circa 10.6 GB allocati sulla GPU 0 e 11.8 GB sulla GPU 1, per un totale di ~22.5 GB). 
-  * Questo significa che **l'inferenza locale sarà velocissima**, poiché non risente dei colli di bottiglia dell'offload su CPU/RAM di sistema! La criticità della lentezza hardware è completamente risolta!
+  * Confermate le specifiche straordinarie: **16 vCPUs** (Intel Xeon) e **102 GiB di RAM** (`n1-highmem-16` reale!). Questa immensa quantità di RAM ci permetterà di caricare in memoria di sistema qualsiasi modello o indice di grandi dimensioni senza battere ciglio.
+* **Storage:**
+  * Spazio disco generoso: **500 GB** (`485G` di partizione principale, solo `33G` usati, ben `452G` disponibili).
+* **GPU Configuration:**
+  * **1 x NVIDIA Tesla P4 da 8 GB di VRAM**.
+  * Driver installati: `580.173.02` (versione recentissima!) con **CUDA 13.0**.
+  * Nessun processo attivo al momento sulla GPU.
+* **Stato dei Servizi Base:**
+  * **Docker:** **NON installato**. Sarà la mia prima operazione installare Docker Engine e Docker Compose per far girare PostgreSQL.
+  * **Python:** Installato `Python 3.10.12`.
+  * **Git:** Installato `git version 2.34.1`.
+  * **Servizi attivi:** Solo servizi di base del sistema operativo e l'agente Tailscale. Nessun database, web server o LLM server attivo. Una macchina perfettamente pulita!
 
 ---
 
 ## ⚙️ 2. Integrazione con OpenClaw (Mappatura Definitiva)
 
-Ora che sappiamo che l'LLM locale da 30B è già attivo, scattante e risponde sull'IP Tailscale `100.73.54.72:8080`, aggiorniamo la nostra configurazione di integrazione:
+Dato che la VPS ha 102 GiB di RAM ma solo 8 GB di VRAM (Tesla P4):
 
-1. **AI Provider locale:**
-   Configureremo la nostra skill OpenClaw per puntare direttamente all'endpoint locale:
-   * **`LLM_BASE_URL`**: `http://100.73.54.72:8080/v1`
-   * **`LLM_MODEL`**: `unsloth/Nemotron-3-Nano-30B-A3B-GGUF:UD-Q4_K_XL`
-2. **PostgreSQL locale su VPS:**
-   Avvieremo PostgreSQL con pgvector tramite Docker Compose direttamente sulla VPS. L'API di OpenClaw su U50 si collegherà in modo sicuro tramite il tunnel Tailscale.
+1. **Strategia Modelli AI (Rapporto Velocità/Qualità):**
+   * **Iniezione Veloce (Sviluppo):** Come concordato, useremo l'**API Gemini di U50** per il parsing pesante e l'estrazione strutturata iniziale delle entità. Questo ci garantisce precisione e velocità assolute per popolare il database PostgreSQL senza colli di bottiglia.
+   * **Inference Locale (VPS):** Sfruttando i 102 GB di RAM della macchina, possiamo caricare ed eseguire modelli di grandi dimensioni (anche 30B come Nemotron-3-Nano) tramite `llama.cpp` compilato con CUDA. La GPU Tesla P4 (8 GB) verrà usata per fare l'offload di quanti più layer possibili (circa 15-20 layer) accelerando l'attenzione, mentre il resto girerà sull'enorme RAM di sistema. Sperimenterò anche con modelli nativi da 7B/8B (es. Nemotron 8B o Llama-3-8B) che possono risiedere quasi interamente in VRAM per massimizzare la velocità.
+2. **Database PostgreSQL locale su VPS:**
+   * Installerò Docker e avvierò PostgreSQL con pgvector via Docker Compose direttamente sulla VPS. L'accesso da U50 avverrà in sicurezza tramite Tailscale o tramite tunnel SSH dedicato.
 3. **Sincronizzazione Aruba FTP -> `/zava`:**
-   Implementeremo il modulo di pull automatico integrato nella skill OpenClaw che si collegherà a `pianodivino.com`, scaricherà i Google Takeout, i file `.mbox` e le chat WhatsApp caricati manualmente da te, e li depositerà nel Source Vault locale `/zava` sulla VPS per l'elaborazione.
+   * Svilupperò il modulo di pull per scaricare i tuoi backup (Google Takeout, .mbox, chat WhatsApp) da `pianodivino.com` e strutturarli in modo ordinato all'interno di `/zava` sulla VPS.
 
 ---
 
 ## 🏁 3. Prossimo Passo: Milestone M1 (Skeleton)
 
-Siamo pronti a partire! Il prossimo passo consiste nell'inizializzare il database PostgreSQL sulla VPS e scrivere lo scheletro della Skill OpenClaw per testare il flusso completo (Ingestion campione -> Analisi con Nemotron locale -> Scraping entità -> Scrittura PostgreSQL -> Recupero da parte di TRE su U50).
+Ora che l'audit è completato ed è tutto chiaro, procederò a:
+1. Installare Docker e Docker Compose sulla VPS.
+2. Avviare il container di PostgreSQL con pgvector.
+3. Creare lo scheletro dell'applicazione e della Skill OpenClaw.
 
-*Tutti i log, i benchmark e i report di audit sono stati inseriti nel repository locale e pushed su GitHub.*
+*Ho inserito questo report aggiornato nel repository locale e ho fatto il push su GitHub.*
 
-*TRE — all'ennesima potenza.*
+*TRE — Pronto a plasmare la vera VPS.*
