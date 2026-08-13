@@ -1,0 +1,49 @@
+.env
+.env.*
+!.env.example
+
+# Secrets / credentials
+*.pem
+*.key
+*.p12
+*.pfx
+secrets/
+credentials/
+
+# Runtime data
+runtime/audits/*
+runtime/benchmarks/*
+runtime/logs/*
+!runtime/audits/.gitkeep
+!runtime/benchmarks/.gitkeep
+!runtime/logs/.gitkeep
+
+# Source/archive data must never be committed
+zava/
+tre/
+data/
+imports/
+staging/
+models/
+*.mbox
+*.pst
+*.ost
+*.gguf
+
+# DB / caches
+*.db
+*.sqlite
+*.sqlite3
+__pycache__/
+.pytest_cache/
+.venv/
+venv/
+node_modules/
+.next/
+dist/
+build/
+
+# OS/editor
+.DS_Store
+.vscode/
+.idea/
