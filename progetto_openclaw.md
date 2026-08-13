@@ -1,6 +1,6 @@
-# Progetto OpenClaw — Integrazione Strategica di Ufficio Zava (Aggiornato)
+# Progetto OpenClaw — Integrazione Strategica di Ufficio Zava (Aggiornato - Post-Audit)
 
-Questo documento descrive come integrare e rendere **Ufficio Zava** nativamente compatibile con l'ecosistema di **OpenClaw su Zava U50**, ottimizzato specificamente per la **VPS con GPU NVIDIA Tesla P4**.
+Questo documento descrive come integrare e rendere **Ufficio Zava** nativamente compatibile con l'ecosistema di **OpenClaw su Zava U50**, ottimizzato specificamente per la **VPS con 2 GPU NVIDIA Tesla T4**.
 
 ---
 
@@ -13,16 +13,16 @@ Questo documento descrive come integrare e rendere **Ufficio Zava** nativamente 
 | **Worker Ingestion** | `office-worker` (Demone sempre attivo su VPS). | **OpenClaw Cron + Sub-agenti (`sessions_spawn`)** | Nessun servizio in background da monitorare; l'ingestion gira asincrona e notifica TRE al termine. |
 | **Database** | PostgreSQL + pgvector su VPS. | **PostgreSQL + pgvector su VPS** (Invariato) | Mantiene l'integrità del modello di verità e la provenienza dei dati. |
 | **Dashboard** | `office-dashboard` (App React/Node da zero). | **Streamlit (Porta 8501) + OpenClaw Canvas** | Sviluppo in puro Python 10 volte più rapido, grafica scura professionale, report HTML renderizzati in chat. |
-| **Modelli AI** | llama.cpp diretto da codice applicativo. | **OpenClaw API Client (Profilo Ibrido)** | Routing intelligente: Gemini (U50) per la chat veloce, Nemotron/Llama locale (VPS) per l'estrazione dati. |
+| **Modelli AI** | llama.cpp diretto da codice applicativo. | **Servizio Nemotron locale su VPS (Porta 8080)** | OpenAI-compatible, già attivo con modello 30B caricato interamente in VRAM (2 x T4). |
 
 ---
 
-## 🚀 2. Decisioni Operative Concordate con Giacomo
+## 🚀 2. Risultati dell'Audit e Decisioni Operative
 
-1. **Focus 100% su VPS e Modelli NVIDIA:**
-   - La compatibilità con il Mac mini M4 (`EDGE`) è temporaneamente congelata.
-   - Ci concentriamo interamente sull'ottimizzazione della VPS (`n1-highmem-16` con 104 GB RAM e GPU Tesla P4 da 8 GB).
-   - Eseguiremo test e benchmark su modelli della famiglia **NVIDIA Nemotron** (es. versioni 8B o compatte) e altri modelli GGUF ottimizzati tramite `llama.cpp` con CUDA offloading, sfruttando al massimo la GPU Tesla P4 per i calcoli di attenzione e la generosa RAM di sistema per i restanti layer.
+1. **La Sorpresa delle 2 GPU NVIDIA Tesla T4:**
+   - La VPS dispone di **2 x Tesla T4 (15 GB VRAM ciascuna, 30 GB totali)**.
+   - Sulla macchina è già attivo il servizio `kraken-nemotron.service` che serve il modello **`unsloth/Nemotron-3-Nano-30B-A3B-GGUF:UD-Q4_K_XL`** sulla porta `8080` dell'IP Tailscale `100.73.54.72`.
+   - Il modello risiede **completamente in VRAM** (~22.5 GB usati), garantendo un'inferenza locale ultra-rapida e precisa senza alcun carico sulla CPU di sistema.
 
 2. **Source Vault Sincronizzato da Aruba FTP:**
    - Giacomo caricherà manualmente sull'FTP di Aruba (`pianodivino.com`) i file esportati (Google Takeout, IMAP mbox mailboxes, WhatsApp backups, OpenAI exports).
@@ -30,7 +30,7 @@ Questo documento descrive come integrare e rendere **Ufficio Zava** nativamente 
 
 3. **Iniezione Rapida con Gemini API:**
    - Durante la fase di sviluppo (Milestone M1 e M2), siamo autorizzati a utilizzare le API di Gemini (attive su U50) come motore ad alte prestazioni per il parsing dei documenti e l'estrazione strutturata delle entità.
-   - Questo ci permetterà di popolare rapidamente il database PostgreSQL con dati reali di test senza essere rallentati dalla latenza iniziale della Tesla P4, consentendoci di ottimizzare il modello locale in parallelo.
+   - Questo ci permetterà di popolare rapidamente il database PostgreSQL con dati reali di test senza essere rallentati dalla latenza iniziale, potendo testare contemporaneamente l'estrazione locale con il modello Nemotron-3-Nano 30B già attivo.
 
 ---
 
@@ -47,7 +47,7 @@ Creeremo una skill chiamata `zava_office` registrabile in OpenClaw. La skill esp
 L'ingestion è l'operazione più pesante. Invece di avere un worker sempre attivo che consuma risorse sulla VPS:
 1. Un **job `cron` di OpenClaw** (eseguito ogni notte o su trigger) avvia un sub-agente isolato usando `sessions_spawn`.
 2. Il sub-agente scarica i nuovi file dal Source Vault `/zava` di Aruba, calcola i checksum e li registra in `sources`.
-3. Il sub-agente invia i frammenti di testo estratti all'LLM (Gemini API in dev, o LLM locale sulla VPS in prod) richiedendo output in JSON strutturato con schema rigido (schema.sql).
+3. Il sub-agente invia i frammenti di testo estratti all'LLM (Gemini API in dev, o Nemotron 30B locale su VPS in prod) richiedendo output in JSON strutturato con schema rigido (schema.sql).
 4. Il sub-agente valida i dati, esegue l'Entity Resolution deterministica ed euristica, e popola le tabelle `facts`, `people`, `organizations` e `open_loops`.
 5. Al termine, il sub-agente si chiude e invia un report di completamento a TRE, che ti riassume le novità al tuo risveglio.
 
@@ -58,11 +58,9 @@ Sviluppare un frontend React responsive da zero richiede settimane. Possiamo ott
 
 ---
 
-## 🚀 4. Prossimo Passo: Milestone M0 (Audit)
-Una volta compilato il file `richiesta_accessi.txt` sulla Scrivania di U50:
-1. Eseguirò l'audit hardware e software della VPS (Phase A del Runbook).
-2. Verificherò la connettività bidirezionale via Tailscale.
-3. Creerò il report di audit sotto `zavapublicoffice/runtime/audits/`.
-4. Avvierò i test per l'installazione di PostgreSQL con pgvector e l'ottimizzazione CUDA di llama.cpp sulla Tesla P4.
+## 🚀 4. Prossimo Passo: Milestone M1 (Skeleton)
+Il database PostgreSQL relazionale con pgvector verrà avviato direttamente sulla VPS in Docker Compose. L'orchestrazione dei parser e delle query verrà scritta sotto forma di OpenClaw Skill ed esposta a TRE, che interrogherà Nemotron locale tramite l'IP Tailscale `100.73.54.72`.
+
+Tutti i log, i file di progetto e il commento aggiornato sono stati inseriti nel repository locale e pushed su GitHub.
 
 *TRE — Pronto all'azione.*

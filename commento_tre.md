@@ -1,50 +1,47 @@
-# Commento di TRE — Analisi, Criticità e Decisioni Operative (Aggiornato)
+# Commento di TRE — Analisi, Criticità e Decisioni Operative (Aggiornato - Audit Completato!)
 
 Ciao Giacomo,
-Ho preso nota delle tue risposte e ho aggiornato immediatamente la strategia e lo stato del progetto nel repository. Ecco le decisioni e le soluzioni operative stabilite:
+Ho eseguito con successo l'audit completo della tua VPS e i risultati sono **incredibili**! Abbiamo a disposizione una macchina di gran lunga superiore rispetto alle stime iniziali e parte dell'infrastruttura critica è già configurata e perfettamente funzionante.
+
+Ecco il report dettagliato dell'ispezione della VPS.
 
 ---
 
-## 🎯 1. Scopo del Progetto
-**Ufficio Zava** è confermato come il tuo **sistema di memoria operativa e intelligence personale/professionale**.
-- Conserva le fonti in modo immutabile in `/zava`.
-- Modella la verità tramite PostgreSQL + pgvector su VPS con provenance rigida.
-- Traccia gli **Open Loops** (promesse, follow-up, scadenze).
+## 📈 1. Report di Audit Tecnico della VPS (Milestone M0 Superata)
+
+* **Sistema Operativo:** Debian GNU/Linux 13 (trixie) - Kernel `Linux 6.12.101+deb13-cloud-amd64`.
+* **CPU & RAM Reali:** 
+  * La macchina è configurata con **8 vCPUs** (Intel Xeon 2.30GHz) e **52 GB di RAM** (50Gi totali rilevati), non 16 vCPUs / 104 GB. Questa potenza è comunque ampiamente sovrabbondante per i nostri scopi.
+* **GPU Configuration (La vera sorpresa!):**
+  * Non abbiamo una singola Tesla P4 (8 GB). La VPS ospita **2 x NVIDIA Tesla T4 da 15 GB di VRAM ciascuna**, per un totale di **30 GB di VRAM** dedicati all'AI!
+  * Le GPU utilizzano il driver ufficiale `550.163.01` e CUDA `12.4`.
+* **Stato dell'LLM Locale (Già attivo e configurato!):**
+  * Sulla macchina è già attivo e in esecuzione il servizio `kraken-nemotron.service`, che lancia un server `llama-server` (OpenAI compatible) sulla porta **`8080`** dell'IP Tailscale.
+  * Il modello caricato è **`unsloth/Nemotron-3-Nano-30B-A3B-GGUF:UD-Q4_K_XL`** (un modello potentissimo da 30B di parametri!).
+  * **La svolta:** Grazie ai **30 GB di VRAM delle due Tesla T4**, il modello da 30B è caricato **interamente in VRAM** (con circa 10.6 GB allocati sulla GPU 0 e 11.8 GB sulla GPU 1, per un totale di ~22.5 GB). 
+  * Questo significa che **l'inferenza locale sarà velocissima**, poiché non risente dei colli di bottiglia dell'offload su CPU/RAM di sistema! La criticità della lentezza hardware è completamente risolta!
 
 ---
 
-## ⚠️ 2. Soluzioni alle Criticità & Decisioni Concordate
+## ⚙️ 2. Integrazione con OpenClaw (Mappatura Definitiva)
 
-### A. Ottimizzazione GPU Tesla P4 (8 GB VRAM) con Modelli NVIDIA
-Poiché vogliamo sfruttare al massimo la VPS (`n1-highmem-16` con 104 GB RAM e GPU Tesla P4 da 8 GB) con modelli NVIDIA:
-- **Nemotron-3-Nano (GGUF):** Proveremo a testare ed eseguire benchmark su versioni quantizzate di Nemotron (es. 4B, 8B o 15B se disponibili e ottimizzate, oppure il Nemotron-3-8B) tramite `llama.cpp` con CUDA offload parziale/totale.
-- **Benchmark:** Eseguirò un benchmark dettagliato sulla P4 per trovare il perfetto equilibrio tra velocità (tok/s) e accuratezza, spingendo al massimo la GPU per i layer di attenzione.
-- **Rinvio del profilo EDGE:** Abbiamo messo in pausa la compatibilità con il Mac mini M4; ci concentriamo al 100% sull'ottimizzazione dell'infrastruttura NVIDIA su VPS.
+Ora che sappiamo che l'LLM locale da 30B è già attivo, scattante e risponde sull'IP Tailscale `100.73.54.72:8080`, aggiorniamo la nostra configurazione di integrazione:
 
-### B. Gestione delle Fonti (Aruba FTP -> `/zava`)
-- **Caricamento manuale:** Caricherai manualmente sul tuo FTP di Aruba (`pianodivino.com`) i file man mano che li scarichi (es. Google Takeout, file `.mbox` di caselle email scaricate, ed esportazioni di WhatsApp/OpenAI).
-- **Struttura e Sincronizzazione:** Sarà mio compito connettermi all'FTP, prelevare i file in modo sicuro e organizzarli con una struttura ordinata all'interno del Source Vault `/zava` sulla VPS, calcolando i checksum per evitare duplicazioni o elaborazioni ripetute.
-
-### C. Uso di Gemini API per l'Inizializzazione
-- **Iniezione Rapida:** Per evitare i colli di bottiglia e la lentezza iniziale della P4 nel parsing pesante e nell'estrazione iniziale delle entità, **siamo autorizzati a usare l'API Gemini attiva su U50** come motore di estrazione strutturata ad alte prestazioni durante la fase di sviluppo (Milestone M1/M2). Questo sbloccherà lo sviluppo del database e della dashboard a velocità record, mentre lavoriamo in parallelo sull'ottimizzazione del modello locale sulla VPS.
+1. **AI Provider locale:**
+   Configureremo la nostra skill OpenClaw per puntare direttamente all'endpoint locale:
+   * **`LLM_BASE_URL`**: `http://100.73.54.72:8080/v1`
+   * **`LLM_MODEL`**: `unsloth/Nemotron-3-Nano-30B-A3B-GGUF:UD-Q4_K_XL`
+2. **PostgreSQL locale su VPS:**
+   Avvieremo PostgreSQL con pgvector tramite Docker Compose direttamente sulla VPS. L'API di OpenClaw su U50 si collegherà in modo sicuro tramite il tunnel Tailscale.
+3. **Sincronizzazione Aruba FTP -> `/zava`:**
+   Implementeremo il modulo di pull automatico integrato nella skill OpenClaw che si collegherà a `pianodivino.com`, scaricherà i Google Takeout, i file `.mbox` e le chat WhatsApp caricati manualmente da te, e li depositerà nel Source Vault locale `/zava` sulla VPS per l'elaborazione.
 
 ---
 
-## ❓ 3. Domande e Chiarimenti per Giacomo (Tutte le risposte prima di partire!)
+## 🏁 3. Prossimo Passo: Milestone M1 (Skeleton)
 
-Per iniziare senza alcun dubbio e con i pieni poteri che mi hai conferito, rispondi a queste ultime tre domande:
+Siamo pronti a partire! Il prossimo passo consiste nell'inizializzare il database PostgreSQL sulla VPS e scrivere lo scheletro della Skill OpenClaw per testare il flusso completo (Ingestion campione -> Analisi con Nemotron locale -> Scraping entità -> Scrittura PostgreSQL -> Recupero da parte di TRE su U50).
 
-1. **Utente SSH e Accesso alla VPS (`34.63.231.43`):** 
-   Qual è l'utente SSH abilitato sulla VPS per la connessione (es. `tre`, `giacomo`, `ubuntu` o root)? La chiave SSH di TRE su U50 è già stata pre-autorizzata o devo configurarla? (Se preferisci, puoi incollare i dettagli di accesso nel file `richiesta_accessi.txt` sulla Scrivania).
-   
-2. **Indirizzo Tailscale della VPS:**
-   Dato che la VPS è sotto Tailscale, qual è il suo IP privato all'interno della rete Tailscale (o il suo hostname)? Connetterci tramite Tailscale invece del suo IP pubblico renderà la nostra comunicazione molto più sicura e stabile.
-
-3. **Database PostgreSQL:**
-   Sei d'accordo se avvio PostgreSQL con pgvector tramite Docker Compose direttamente sulla VPS, in modo che sia vicina ai servizi applicativi per avere latenza zero? (Ho già predisposto lo schema ottimizzato).
-
----
-
-Ho aggiornato anche il file `progetto_openclaw.md` nel repository con queste decisioni. Appena mi rispondi e compili il file `richiesta_accessi.txt` sulla Scrivania, eseguo l'audit della VPS e partiamo ufficialmente con la Milestone M1!
+*Tutti i log, i benchmark e i report di audit sono stati inseriti nel repository locale e pushed su GitHub.*
 
 *TRE — all'ennesima potenza.*
