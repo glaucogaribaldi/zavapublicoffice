@@ -1,0 +1,51 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-zavaoffice}
+      POSTGRES_USER: ${POSTGRES_USER:-zavaoffice}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change_me}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/001-schema.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-zavaoffice} -d ${POSTGRES_DB:-zavaoffice}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  office-api:
+    build: ./services/api
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${OFFICE_API_PORT:-8088}:8088"
+
+  office-worker:
+    build: ./services/worker
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  office-dashboard:
+    build: ./services/dashboard
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - office-api
+    ports:
+      - "${OFFICE_DASHBOARD_PORT:-3000}:3000"
+
+  # Implement only after VPS audit and benchmark.
+  # Prefer binding the actual llama.cpp server to internal/Tailscale interfaces.
+  # llm-server:
+  #   ...
+
+volumes:
+  postgres_data:
